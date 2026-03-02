@@ -1,0 +1,38 @@
+﻿# Klarifikasi Conflict Rule - Jadwal V2
+
+1. Konfirmasi rule baru:
+- Drop tetap diperbolehkan walau bentrok antar kelas pada jam yang sama (guru sama), benar?
+Benar
+
+2. Bentrok yang boleh diloloskan hanya:
+- bentrok guru antar kelas?
+atau juga
+- bentrok kelas pada slot yang sama? Boleh
+- max jam guru melebihi batas? Tidak
+- slot libur? Boleh
+
+3. Border merah ditampilkan di mana:
+- hanya pada card yang bentrok di cell baru,
+- atau semua card yang terlibat bentrok (termasuk card lama di kelas lain)?
+Cell baru dan cell lama
+
+4. Jika satu card bentrok dengan lebih dari satu card lain, apakah cukup 1 border merah saja?
+border merah di semua cell
+
+5. Apakah perlu icon/text kecil di card, misalnya `Bentrok`, selain border merah?
+cukup border merah
+
+6. Saat card bentrok dihapus, border merah pada card lain harus hilang otomatis, benar?
+jika sudah tidak ada bentrok, maka border merah hilang
+
+7. Di panel kiri (sisa jam `x`) apakah behavior tetap sama seperti sekarang (tetap berkurang saat drop berhasil walau bentrok)?
+Ya
+
+8. Di daftar error/warning global perlu ditampilkan juga, atau cukup visual border merah di calendar?
+Tambahkan juga daftar error / warning global
+
+9. Untuk warna border merah, apakah pakai merah solid saja (tanpa efek lain), benar?
+sarankan yang terbaik menurutmu, beri 3 opsi
+
+10. Rule ini berlaku hanya untuk `Jadwal V2`, dan `Jadwal` lama tetap behavior sebelumnya, benar?
+Hanya di Jadwal V2
