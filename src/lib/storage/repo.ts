@@ -1,4 +1,4 @@
-﻿import {
+import {
   APP_VERSION,
   DAYS_OF_WEEK,
   type ActiveDayConfig,
@@ -10,6 +10,7 @@
   type ScheduleMeta,
   type Teacher,
   type TimeSlot,
+  type AISettings,
 } from "@/types";
 import { STORAGE_KEYS } from "@/lib/storage/keys";
 
@@ -67,6 +68,17 @@ export const bootstrapStorage = (): void => {
 };
 
 export const storageRepo = {
+  getAISettings: (): AISettings | null => {
+    const settings = safeRead<AISettings | null>(STORAGE_KEYS.aiSettings, null);
+    if (!settings) return null;
+    // Auto-migrate old wrong Sumopod URL
+    if (settings.baseUrl?.includes("api.sumopod.com")) {
+      settings.baseUrl = settings.baseUrl.replace("api.sumopod.com", "ai.sumopod.com");
+    }
+    return settings;
+  },
+  setAISettings: (value: AISettings | null): void => safeWrite(STORAGE_KEYS.aiSettings, value),
+
   getVersion: (): string => safeRead<string>(STORAGE_KEYS.version, APP_VERSION),
   setVersion: (version: string): void => safeWrite(STORAGE_KEYS.version, version),
 

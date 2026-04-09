@@ -1,4 +1,4 @@
-﻿export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.0.0";
 
 export const DAYS_OF_WEEK = [
   "senin",
@@ -60,6 +60,13 @@ export interface ScheduleEntry {
   timeSlotId: string;
   subjectName: string;
   teacherId: string;
+}
+
+export interface AISettings {
+  provider?: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
 }
 
 export interface ScheduleMeta {

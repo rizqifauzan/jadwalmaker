@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
 import { dayLabel } from "@/lib/utils/day";
 import { createId } from "@/lib/utils/id";
-import { DAYS_OF_WEEK, type Assignment, type BlockedSlot, type Classroom, type DayOfWeek, type ScheduleEntry, type Teacher, type TimeSlot } from "@/types";
+import { DAYS_OF_WEEK, type Assignment, type BlockedSlot, type Classroom, type DayOfWeek, type ScheduleEntry, type Teacher, type TimeSlot, type AISettings } from "@/types";
+import { generateSchedule, solveConflicts } from "@/lib/ai/client";
 
 interface DragPayload {
   kind: "assignment";
@@ -52,9 +53,12 @@ export default function JadwalV3Page(): React.JSX.Element {
   const [isMobile, setIsMobile] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [draggingPayload, setDraggingPayload] = useState<DragPayload | DragEntryPayload | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiSettings, setAiSettings] = useState<AISettings | null>(null);
 
   useEffect(() => {
     const snapshot = storageRepo.getSnapshot();
+    setAiSettings(storageRepo.getAISettings());
     setClassrooms(snapshot.classrooms);
     setTeachers(snapshot.teachers);
     setAssignments(snapshot.assignments);
@@ -352,6 +356,32 @@ export default function JadwalV3Page(): React.JSX.Element {
     setMessage("Jadwal berhasil dihapus.");
   };
 
+  const handleAiAction = async (action: 'generate' | 'solve') => {
+    if (!aiSettings || !aiSettings.apiKey) {
+      alert("Harap konfigurasi API Key AI di halaman Settings terlebih dahulu!");
+      return;
+    }
+
+    setIsAiLoading(true);
+    setMessage(action === 'generate' ? "AI sedang menyusun jadwal dari nol..." : "AI sedang memperbaiki jadwal...");
+
+    try {
+      const snapshot = storageRepo.getSnapshot();
+      const newEntries = action === 'generate' 
+        ? await generateSchedule(snapshot, aiSettings)
+        : await solveConflicts(snapshot, aiSettings);
+        
+      setEntries(newEntries);
+      storageRepo.setScheduleEntries(newEntries);
+      storageRepo.setScheduleMeta({ status: "draft_ok", lastUpdatedAt: new Date().toISOString() });
+      setMessage(action === 'generate' ? "Jadwal berhasil digenerate oleh AI!" : "Konflik berhasil diselesaikan oleh AI!");
+    } catch (err: unknown) {
+      setMessage(`Gagal memproses AI: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   if (!hydrated) {
     return (
       <div className="jadwal-v2-layout">
@@ -377,7 +407,33 @@ export default function JadwalV3Page(): React.JSX.Element {
       <section className="panel jadwal-v2-left">
         <h2>Jadwal V3</h2>
         <p className="muted">Pilih kelas lalu drag card mapel ke grid di kanan.</p>
-        {message && <p className="badge warn">{message}</p>}
+        
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px", marginTop: "12px" }}>
+          <button 
+            className="primary" 
+            onClick={() => handleAiAction('generate')}
+            disabled={isAiLoading || !aiSettings?.apiKey}
+            style={{ opacity: (isAiLoading || !aiSettings?.apiKey) ? 0.6 : 1 }}
+          >
+            ✨ Auto-Generate AI
+          </button>
+          <button 
+            className="primary" 
+            onClick={() => handleAiAction('solve')}
+            disabled={isAiLoading || entries.length === 0 || conflictAnalysis.issues.length === 0 || !aiSettings?.apiKey}
+            style={{ opacity: (isAiLoading || entries.length === 0 || conflictAnalysis.issues.length === 0 || !aiSettings?.apiKey) ? 0.6 : 1 }}
+          >
+            🛠️ Solve Conflicts AI
+          </button>
+        </div>
+        
+        {!aiSettings?.apiKey && (
+          <p className="muted" style={{ fontSize: '0.85rem', marginBottom: "12px", color: 'orange' }}>
+            * Anda belum setup API Key di Settings.
+          </p>
+        )}
+
+        {message && <p className="badge warn" style={{ marginBottom: "12px" }}>{message}</p>}
 
         <div className="tabs" style={{ marginBottom: 12 }}>
           {classrooms.map((classroom) => (
@@ -438,7 +494,20 @@ export default function JadwalV3Page(): React.JSX.Element {
           </p>
         )}
 
-        <div className="calendar-wrap">
+        {isAiLoading && (
+          <div style={{ 
+            padding: "20px", 
+            background: "#fff9c4", 
+            border: "1px solid #ffd54f",
+            borderRadius: "8px",
+            marginBottom: "16px",
+            textAlign: "center"
+          }}>
+            <strong>Sedang memproses AI, mohon tunggu...</strong>
+          </div>
+        )}
+
+        <div className="calendar-wrap" style={{ opacity: isAiLoading ? 0.5 : 1, pointerEvents: isAiLoading ? 'none' : 'auto' }}>
           <table className="v2-table">
             <thead>
               <tr>

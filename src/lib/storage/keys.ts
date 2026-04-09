@@ -1,4 +1,4 @@
-﻿export const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   version: "jadwal_app.version",
   teachers: "jadwal_app.teachers",
   classrooms: "jadwal_app.classrooms",
@@ -8,4 +8,5 @@
   assignments: "jadwal_app.assignments",
   scheduleEntries: "jadwal_app.schedule_entries",
   scheduleMeta: "jadwal_app.schedule_meta",
+  aiSettings: "jadwal_app.ai_settings",
 } as const;
