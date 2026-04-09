@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
@@ -19,6 +19,40 @@ export default function TimeSlotsPage(): React.JSX.Element {
   const save = (next: TimeSlot[]) => {
     setTimeSlots(next);
     storageRepo.setTimeSlots(next);
+  };
+
+  const formatTime = (totalMins: number) => {
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  };
+
+  const generateTimeSlots = (count: number) => {
+    let currentMins = 7 * 60; // Default start at 07:00
+    if (timeSlots.length > 0) {
+      const lastSlot = timeSlots[timeSlots.length - 1];
+      const [h, m] = lastSlot.endTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        currentMins = h * 60 + m;
+      }
+    }
+
+    const durationMins = 45; // 45 minutes per slot
+    const startIndex = timeSlots.length;
+
+    const newSlots: TimeSlot[] = Array.from({ length: count }).map((_, i) => {
+      const startTime = formatTime(currentMins);
+      currentMins += durationMins;
+      const endTime = formatTime(currentMins);
+      return {
+        id: createId(),
+        name: `Jam ${startIndex + i + 1}`,
+        startTime,
+        endTime,
+      };
+    });
+
+    save([...timeSlots, ...newSlots]);
   };
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -87,6 +121,21 @@ export default function TimeSlotsPage(): React.JSX.Element {
             Simpan Jam Pelajaran
           </button>
         </form>
+      </section>
+
+      <section className="panel">
+        <h2>Generate Jam Pelajaran Otomatis</h2>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "1rem" }}>
+          {[3, 5, 10].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => generateTimeSlots(count)}
+            >
+              + {count} Jam
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="panel">

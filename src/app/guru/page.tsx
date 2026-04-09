@@ -1,9 +1,18 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
 import { createId, toIntOrNull } from "@/lib/utils/id";
 import type { Teacher } from "@/types";
+
+const HARDCODED_TEACHERS = [
+  "Budi Santoso", "Siti Aminah", "Eko Prasetyo", "Dewi Lestari", "Agus Salim",
+  "Rina Supriati", "Hendro Siswanto", "Sri Wahyuni", "Ahmad Fauzi", "Nurul Hidayah",
+  "Dwi Cahyono", "Ratna Sari", "Joko Anwar", "Kartika Putri", "Iwan Ramadhan",
+  "Nita Thalia", "Rizky Firmansyah", "Fitriani", "Andi Saputra", "Maya Anggraini",
+  "Doni Kusuma", "Reni Marlina", "Hasan Basri", "Lilis Karlina", "Arief Wibowo",
+  "Sukmawati", "Yudi Pratama", "Nadia Vega", "Bambang Pamungkas", "Indah Permatasari"
+];
 
 const defaultForm = { name: "", maxHoursPerWeek: "", notes: "" };
 
@@ -18,6 +27,16 @@ export default function TeachersPage(): React.JSX.Element {
   const saveTeachers = (next: Teacher[]) => {
     setTeachers(next);
     storageRepo.setTeachers(next);
+  };
+
+  const generateTeachers = (count: number) => {
+    const newTeachers: Teacher[] = Array.from({ length: count }).map((_, i) => ({
+      id: createId(),
+      name: HARDCODED_TEACHERS[i % HARDCODED_TEACHERS.length],
+      maxHoursPerWeek: null,
+      notes: "Auto generated",
+    }));
+    saveTeachers([...teachers, ...newTeachers]);
   };
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -74,6 +93,21 @@ export default function TeachersPage(): React.JSX.Element {
             Simpan Guru
           </button>
         </form>
+      </section>
+
+      <section className="panel">
+        <h2>Generate Guru Otomatis</h2>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "1rem" }}>
+          {[5, 10, 20, 30].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => generateTeachers(count)}
+            >
+              + {count} Guru
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="panel">

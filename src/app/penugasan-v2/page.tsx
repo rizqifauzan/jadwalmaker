@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
@@ -238,6 +238,58 @@ export default function AssignmentsV2Page(): React.JSX.Element {
     storageRepo.setAssignments(next);
   };
 
+  const generateAssignments = (): void => {
+    if (classrooms.length === 0 || teachers.length === 0) {
+      setMessage("Data kelas dan guru harus ada untuk generate penugasan.");
+      return;
+    }
+
+    const COMMON_SUBJECTS = [
+      { name: "Matematika", hours: 4 },
+      { name: "B. Indonesia", hours: 4 },
+      { name: "B. Inggris", hours: 4 },
+      { name: "IPA", hours: 4 },
+      { name: "IPS", hours: 3 },
+      { name: "Seni Budaya", hours: 2 },
+      { name: "Penjaskes", hours: 2 },
+      { name: "Agama", hours: 2 },
+    ];
+
+    const generated: Assignment[] = [];
+    let teacherIndex = 0;
+
+    for (const classroom of classrooms) {
+      for (const subj of COMMON_SUBJECTS) {
+        const exists = allAssignments.some(
+          (a) =>
+            a.classroomId === classroom.id &&
+            a.subjectName.toLowerCase() === subj.name.toLowerCase()
+        );
+
+        if (!exists) {
+          generated.push({
+            id: createId(),
+            classroomId: classroom.id,
+            subjectName: subj.name,
+            teacherId: teachers[teacherIndex % teachers.length].id,
+            hoursPerWeek: subj.hours,
+          });
+          teacherIndex++;
+        }
+      }
+    }
+
+    if (generated.length === 0) {
+      setMessage("Seluruh penugasan dasar sudah lengkap di semua kelas.");
+      return;
+    }
+
+    const nextAll = [...allAssignments, ...generated];
+    setAllAssignments(nextAll);
+    storageRepo.setAssignments(nextAll);
+    setMessage(`${generated.length} penugasan berhasil di-generate secara otomatis.`);
+  };
+
   const addRow = (): void => {
     setRows((prev) => [
       ...prev,
@@ -349,6 +401,16 @@ export default function AssignmentsV2Page(): React.JSX.Element {
             </div>
           </>
         )}
+      </section>
+
+      <section className="panel">
+        <h2>Generate Penugasan Otomatis</h2>
+        <p className="muted" style={{ marginBottom: "1rem" }}>
+          Buat draft penugasan dasar (Matematika, B. Inggris, dll) secara otomatis untuk semua kelas. Guru akan di-assign secara acak/merata.
+        </p>
+        <button type="button" onClick={generateAssignments}>
+          Generate Penugasan Demo
+        </button>
       </section>
 
       <section className="panel">

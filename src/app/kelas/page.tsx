@@ -1,9 +1,18 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
 import { createId } from "@/lib/utils/id";
 import type { Classroom } from "@/types";
+
+const DUMMY_CLASSROOMS = [
+  "7A", "7B", "7C", "7D", "7E",
+  "8A", "8B", "8C", "8D", "8E",
+  "9A", "9B", "9C", "9D", "9E",
+  "10 IPA 1", "10 IPA 2", "10 IPS 1", "10 IPS 2", "10 BAHASA",
+  "11 IPA 1", "11 IPA 2", "11 IPS 1", "11 IPS 2", "11 BAHASA",
+  "12 IPA 1", "12 IPA 2", "12 IPS 1", "12 IPS 2", "12 BAHASA"
+];
 
 export default function ClassroomsPage(): React.JSX.Element {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -16,6 +25,15 @@ export default function ClassroomsPage(): React.JSX.Element {
   const save = (next: Classroom[]) => {
     setClassrooms(next);
     storageRepo.setClassrooms(next);
+  };
+
+  const generateClassrooms = (count: number) => {
+    const startIndex = classrooms.length;
+    const newClasses: Classroom[] = Array.from({ length: count }).map((_, i) => ({
+      id: createId(),
+      name: DUMMY_CLASSROOMS[(startIndex + i) % DUMMY_CLASSROOMS.length],
+    }));
+    save([...classrooms, ...newClasses]);
   };
 
   return (
@@ -47,6 +65,21 @@ export default function ClassroomsPage(): React.JSX.Element {
             Simpan Kelas
           </button>
         </form>
+      </section>
+
+      <section className="panel">
+        <h2>Generate Kelas Otomatis</h2>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "1rem" }}>
+          {[3, 5, 10].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => generateClassrooms(count)}
+            >
+              + {count} Kelas
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="panel">
