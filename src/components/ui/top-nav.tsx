@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +13,7 @@ const links = [
   { href: "/penugasan-v2", label: "Penugasan V2" },
   { href: "/jadwal", label: "Jadwal" },
   { href: "/jadwal-v2", label: "Jadwal V2" },
+  { href: "/jadwal-v3", label: "Jadwal V3" },
   { href: "/print/kelas", label: "Print Kelas" },
   { href: "/print/guru", label: "Print Guru" },
   { href: "/settings", label: "Settings" },
