@@ -8,6 +8,7 @@ import type { AISettings } from "@/types";
 export default function SettingsPage(): React.JSX.Element {
   const [message, setMessage] = useState("");
   const [isTesting, setIsTesting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [aiSettings, setAiSettings] = useState<AISettings>({
     provider: "z-ai",
     baseUrl: "https://api.z.ai/api/paas/v4/chat/completions",
@@ -77,13 +78,11 @@ export default function SettingsPage(): React.JSX.Element {
 
     setIsTesting(true);
     setMessage("Sedang mengetes koneksi AI...");
-    
+
     try {
       const response = await fetch("/api/ai", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           baseUrl: aiSettings.baseUrl,
           model: aiSettings.model,
@@ -102,12 +101,12 @@ export default function SettingsPage(): React.JSX.Element {
         }
         throw new Error(`Proxy/Provider Error: ${errorText}`);
       }
-      
+
       const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
       if (!data.choices?.[0]?.message?.content) {
-         throw new Error("Invalid format from AI response");
+        throw new Error("Invalid format from AI response");
       }
-      
+
       setMessage("✅ Test berhasil! Koneksi API valid.");
     } catch (err: unknown) {
       setMessage(`❌ Test gagal: ${err instanceof Error ? err.message : String(err)}`);
@@ -116,8 +115,16 @@ export default function SettingsPage(): React.JSX.Element {
     }
   };
 
+  const onResetData = (): void => {
+    storageRepo.resetAllData();
+    setConfirmReset(false);
+    setMessage("✅ Semua data berhasil direset. Halaman akan di-refresh...");
+    setTimeout(() => window.location.reload(), 1200);
+  };
+
   return (
     <div className="page-grid">
+      {/* ── Konfigurasi AI ──────────────────────────────────────── */}
       <section className="panel">
         <h2>Konfigurasi AI</h2>
         <form onSubmit={onSaveAiSettings} style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 500 }}>
@@ -170,8 +177,8 @@ export default function SettingsPage(): React.JSX.Element {
             <button type="submit" className="primary" disabled={isTesting}>
               Simpan Konfigurasi AI
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={(e) => { e.preventDefault(); void onTestConnection(); }}
               disabled={isTesting}
               style={{ padding: "8px 16px", borderRadius: 4, border: "1px solid #ccc", background: "#f8f9fa", cursor: "pointer", opacity: isTesting ? 0.6 : 1 }}
@@ -182,6 +189,7 @@ export default function SettingsPage(): React.JSX.Element {
         </form>
       </section>
 
+      {/* ── Backup dan Restore ──────────────────────────────────── */}
       <section className="panel">
         <h2>Backup dan Restore</h2>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -207,6 +215,73 @@ export default function SettingsPage(): React.JSX.Element {
         <p className="muted" style={{ marginTop: 12 }}>
           Catatan: data tersimpan di browser ini. Export JSON tidak akan menyertakan API Key AI Anda demi keamanan.
         </p>
+      </section>
+
+      {/* ── Danger Zone ─────────────────────────────────────────── */}
+      <section
+        className="panel"
+        style={{
+          border: "1.5px solid #f2c1bb",
+          background: "linear-gradient(135deg, #fff8f7 0%, #fff 100%)",
+        }}
+      >
+        <h2 style={{ color: "var(--danger)", marginBottom: 4 }}>⚠️ Danger Zone</h2>
+        <p className="muted" style={{ marginBottom: 16, fontSize: 13 }}>
+          Tindakan di bawah ini <strong>tidak dapat dibatalkan</strong>.{" "}
+          Semua data guru, kelas, jam, penugasan, dan jadwal akan dihapus permanen dari browser ini.
+          Konfigurasi AI Anda akan tetap dipertahankan.
+        </p>
+
+        {!confirmReset ? (
+          <button
+            id="btn-reset-data"
+            type="button"
+            className="danger"
+            style={{ fontWeight: 600, padding: "10px 20px" }}
+            onClick={() => setConfirmReset(true)}
+          >
+            🗑️ Reset Semua Data
+          </button>
+        ) : (
+          <div
+            style={{
+              background: "var(--danger-soft)",
+              border: "1.5px solid #f2c1bb",
+              borderRadius: 10,
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              maxWidth: 460,
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 600, color: "var(--danger)" }}>
+              Yakin ingin menghapus semua data?
+            </p>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
+              Guru, kelas, jam pelajaran, penugasan, dan seluruh jadwal akan dihapus.
+              Tindakan ini <strong>permanen dan tidak bisa dikembalikan</strong>.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                id="btn-reset-confirm"
+                type="button"
+                className="danger"
+                style={{ fontWeight: 700 }}
+                onClick={onResetData}
+              >
+                Ya, hapus semuanya
+              </button>
+              <button
+                id="btn-reset-cancel"
+                type="button"
+                onClick={() => setConfirmReset(false)}
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

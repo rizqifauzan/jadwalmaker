@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
 import { createId } from "@/lib/utils/id";
 import type { Assignment, Classroom, Teacher } from "@/types";
+import { TeacherCombobox } from "@/components/ui/teacher-combobox";
 
 interface FormState {
   classroomId: string;
@@ -113,16 +114,11 @@ export default function AssignmentsPage(): React.JSX.Element {
               </label>
               <label>
                 Guru
-                <select
+                <TeacherCombobox
+                  teachers={teachers}
                   value={form.teacherId}
-                  onChange={(event) => setForm((prev) => ({ ...prev, teacherId: event.target.value }))}
-                >
-                  {teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(teacherId) => setForm((prev) => ({ ...prev, teacherId }))}
+                />
               </label>
             </div>
             <div className="form-row">

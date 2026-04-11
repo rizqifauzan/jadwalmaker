@@ -55,6 +55,7 @@ export default function JadwalV3Page(): React.JSX.Element {
   const [draggingPayload, setDraggingPayload] = useState<DragPayload | DragEntryPayload | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiSettings, setAiSettings] = useState<AISettings | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     const snapshot = storageRepo.getSnapshot();
@@ -330,11 +331,6 @@ export default function JadwalV3Page(): React.JSX.Element {
     subjectName: string;
     teacherId: string;
   }): void => {
-    const proceed = window.confirm("Hapus jadwal ini?");
-    if (!proceed) {
-      return;
-    }
-
     const targetIndex = entries.findIndex(
       (entry) =>
         entry.id === target.entryId &&
@@ -354,6 +350,7 @@ export default function JadwalV3Page(): React.JSX.Element {
     storageRepo.setScheduleEntries(nextEntries);
     storageRepo.setScheduleMeta({ status: "draft_ok", lastUpdatedAt: new Date().toISOString() });
     setMessage("Jadwal berhasil dihapus.");
+    setPendingDeleteId(null);
   };
 
   const handleAiAction = async (action: 'generate' | 'solve') => {
@@ -451,7 +448,9 @@ export default function JadwalV3Page(): React.JSX.Element {
         <div className="page-grid">
           {assignmentCards.length === 0 && <p className="muted">Tidak ada sisa jam assignment.</p>}
           {assignmentCards.map(({ assignment, remaining }) => {
-            const teacherName = teacherMap.get(assignment.teacherId)?.name ?? "-";
+            const teacher = teacherMap.get(assignment.teacherId);
+            const teacherName = teacher?.name ?? "-";
+            const teacherNotes = teacher?.notes?.trim() ?? "";
             const payload: DragPayload = {
               kind: "assignment",
               assignmentId: assignment.id,
@@ -462,7 +461,7 @@ export default function JadwalV3Page(): React.JSX.Element {
             return (
               <article
                 key={assignment.id}
-                className="entry-chip"
+                className="entry-chip assignment-card-tip"
                 style={{ cursor: "grab", position: "relative", background: "#fff" }}
                 draggable={!isMobile}
                 onDragStart={(event) => {
@@ -470,20 +469,33 @@ export default function JadwalV3Page(): React.JSX.Element {
                   event.dataTransfer.setData("application/json", JSON.stringify(payload));
                 }}
                 onDragEnd={() => setDraggingPayload(null)}
+                data-notes={teacherNotes || undefined}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                   <div>
                     <strong>{assignment.subjectName}</strong>
-                    <div>{teacherName}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      {teacherName}
+                      {teacherNotes && (
+                        <span className="assignment-card-note-dot" aria-hidden="true" title="Ada catatan">📝</span>
+                      )}
+                    </div>
                   </div>
                   <span className="badge ok" title="Sisa jam">
                     {remaining}x
                   </span>
                 </div>
+                {teacherNotes && (
+                  <div className="assignment-card-tooltip" role="tooltip">
+                    <strong>Catatan Guru</strong>
+                    <span>{teacherNotes}</span>
+                  </div>
+                )}
               </article>
             );
           })}
         </div>
+
       </section>
 
       <section className="panel jadwal-v2-right">
@@ -511,8 +523,8 @@ export default function JadwalV3Page(): React.JSX.Element {
           <table className="v2-table">
             <thead>
               <tr>
-                <th>Hari</th>
-                <th>Jam</th>
+                <th className="v2-sticky-day">Hari</th>
+                <th className="v2-sticky-time">Jam</th>
                 {classrooms.map((classroom) => (
                   <th key={`head-${classroom.id}`}>{classroom.name}</th>
                 ))}
@@ -616,37 +628,66 @@ export default function JadwalV3Page(): React.JSX.Element {
                                     <strong>{entry.subjectName}</strong>
                                     <div>{teacherMap.get(entry.teacherId)?.name ?? "-"}</div>
                                   </div>
-                                  <div
-                                    title="Hapus"
-                                    aria-label="Hapus"
-                                    role="button"
-                                    tabIndex={0}
-                                    className="v2-delete-icon"
-                                    onClick={() =>
-                                      deleteEntry({
-                                        entryId: entry.id,
-                                        classroomId: entry.classroomId,
-                                        day: entry.day,
-                                        timeSlotId: entry.timeSlotId,
-                                        subjectName: entry.subjectName,
-                                        teacherId: entry.teacherId,
-                                      })
-                                    }
-                                    onKeyDown={(event) => {
-                                      if (event.key === "Enter" || event.key === " ") {
-                                        event.preventDefault();
-                                        deleteEntry({
-                                          entryId: entry.id,
-                                          classroomId: entry.classroomId,
-                                          day: entry.day,
-                                          timeSlotId: entry.timeSlotId,
-                                          subjectName: entry.subjectName,
-                                          teacherId: entry.teacherId,
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    <DeleteIcon />
+
+                                  {/* ── Delete icon + inline confirm popover ── */}
+                                  <div className="v2-delete-wrap">
+                                    <div
+                                      title="Hapus"
+                                      aria-label="Hapus"
+                                      role="button"
+                                      tabIndex={0}
+                                      className={`v2-delete-icon ${pendingDeleteId === entry.id ? "v2-delete-icon--active" : ""}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPendingDeleteId(
+                                          pendingDeleteId === entry.id ? null : entry.id
+                                        );
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                          event.preventDefault();
+                                          setPendingDeleteId(
+                                            pendingDeleteId === entry.id ? null : entry.id
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      <DeleteIcon />
+                                    </div>
+
+                                    {pendingDeleteId === entry.id && (
+                                      <div
+                                        className="v2-delete-popover"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <span className="v2-delete-popover-label">Hapus jadwal ini?</span>
+                                        <div className="v2-delete-popover-actions">
+                                          <button
+                                            type="button"
+                                            className="v2-delete-popover-cancel"
+                                            onClick={() => setPendingDeleteId(null)}
+                                          >
+                                            Batal
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="v2-delete-popover-confirm"
+                                            onClick={() =>
+                                              deleteEntry({
+                                                entryId: entry.id,
+                                                classroomId: entry.classroomId,
+                                                day: entry.day,
+                                                timeSlotId: entry.timeSlotId,
+                                                subjectName: entry.subjectName,
+                                                teacherId: entry.teacherId,
+                                              })
+                                            }
+                                          >
+                                            Ya, hapus
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </article>
                               ))}

@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #f7f9fc;
   --surface: #ffffff;
   --surface-muted: #eef3fb;
@@ -217,9 +217,10 @@ th {
 }
 
 .calendar-wrap {
-  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
+  display: inline-block;
+  min-width: 100%;
 }
 
 .calendar-grid {
@@ -236,27 +237,67 @@ th {
 .v2-table {
   width: 100%;
   min-width: 980px;
-  border-collapse: collapse;
+  /* border-separate is required for position:sticky on cells */
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .v2-table th,
 .v2-table td {
-  border: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   padding: 8px;
   vertical-align: top;
 }
 
-.v2-table th {
-  background: var(--surface-muted);
+/* Restore left/top border on first col & first row */
+.v2-table thead tr th:first-child,
+.v2-table tbody tr td:first-child {
+  border-left: 1px solid var(--border);
 }
 
-.v2-day-cell {
-  background: #fdfefe;
+.v2-table thead tr th {
+  border-top: 1px solid var(--border);
+}
+
+.v2-table th {
+  background: var(--surface-muted);
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+
+/* ── Sticky Hari column (col 1) ─────────────────────────────── */
+.v2-day-cell,
+th.v2-sticky-day {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  background: #f4f7fb;
   min-width: 110px;
 }
 
-.v2-time-cell {
+th.v2-sticky-day {
+  z-index: 32;
+  /* above body sticky cells */
+}
+
+/* ── Sticky Jam column (col 2) ──────────────────────────────── */
+.v2-time-cell,
+th.v2-sticky-time {
+  position: sticky;
+  left: 110px;
+  /* must match v2-day-cell min-width */
+  z-index: 30;
+  background: #fff;
   min-width: 150px;
+  /* shadow acts as visual divider when scrolled */
+  box-shadow: 2px 0 6px -2px rgba(24, 39, 75, 0.10);
+}
+
+th.v2-sticky-time {
+  background: var(--surface-muted);
+  z-index: 32;
 }
 
 .v2-drop-cell {
@@ -295,10 +336,14 @@ th {
   border: 0;
 }
 
-.v2-delete-icon {
+.v2-delete-wrap {
   position: absolute;
   top: 6px;
   right: 6px;
+  z-index: 20;
+}
+
+.v2-delete-icon {
   width: 18px;
   height: 18px;
   display: inline-flex;
@@ -306,11 +351,102 @@ th {
   justify-content: center;
   color: var(--danger);
   cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s;
+}
+
+.v2-delete-icon:hover,
+.v2-delete-icon--active {
+  background: var(--danger-soft);
 }
 
 .v2-delete-icon svg {
   width: 12px;
   height: 12px;
+}
+
+/* ── Inline delete popover ───────────────────────────────────── */
+.v2-delete-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: #1c2b47;
+  color: #f0f4ff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 20px rgba(24, 39, 75, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: popover-in 0.14s ease;
+  white-space: nowrap;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Arrow pointing down */
+.v2-delete-popover::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 6px;
+  border: 5px solid transparent;
+  border-top-color: #1c2b47;
+}
+
+.v2-delete-popover-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c8d8f8;
+}
+
+.v2-delete-popover-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.v2-delete-popover-confirm {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.1s;
+}
+
+.v2-delete-popover-confirm:hover {
+  opacity: 0.88;
+}
+
+.v2-delete-popover-cancel {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #c8d8f8;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.v2-delete-popover-cancel:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .v2-conflict-chip {
@@ -389,7 +525,7 @@ th {
   position: sticky;
   top: 12px;
   max-height: calc(100vh - 24px);
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .jadwal-v2-right {
@@ -398,6 +534,7 @@ th {
 }
 
 @media (max-width: 960px) {
+
   .two-col,
   .three-col,
   .form-row {
@@ -422,4 +559,228 @@ th {
     height: auto;
     overflow: visible;
   }
+}
+
+/* ── TeacherCombobox ─────────────────────────────────────────── */
+.teacher-combobox {
+  position: relative;
+  width: 100%;
+}
+
+/* Trigger button (closed state) */
+.teacher-combobox-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text);
+  gap: 6px;
+  transition: border-color 0.15s;
+}
+
+.teacher-combobox-trigger:hover,
+.teacher-combobox-trigger:focus-visible {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.teacher-combobox-placeholder {
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.teacher-combobox-selected-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-combobox-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.teacher-combobox-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: transparent;
+  transition: background 0.1s, color 0.1s;
+}
+
+.teacher-combobox-clear:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.teacher-combobox-chevron {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Search input (open state) */
+.teacher-combobox-search {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--primary);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  gap: 6px;
+}
+
+.teacher-combobox-search-icon {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.teacher-combobox-input {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  padding: 9px 0;
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+  color: var(--text);
+}
+
+/* Dropdown list */
+.teacher-combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(24, 39, 75, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.teacher-combobox-empty {
+  padding: 12px 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.teacher-combobox-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+  gap: 8px;
+  transition: background 0.1s;
+}
+
+.teacher-combobox-item--highlighted {
+  background: var(--primary-soft);
+}
+
+.teacher-combobox-item--selected {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.teacher-combobox-item-name {
+  flex: 1;
+}
+
+.teacher-combobox-item-check {
+  color: var(--primary);
+  font-size: 13px;
+}
+
+/* ── Assignment Card Tooltip (Catatan Guru) ──────────────────── */
+.assignment-card-tip {
+  /* needs relative positioning for the tooltip */
+  position: relative;
+  isolation: isolate;
+}
+
+.assignment-card-tooltip {
+  /* hidden by default */
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, visibility 0.18s ease, transform 0.18s ease;
+  transform: translateY(4px);
+
+  /* positioning: above the card */
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 300;
+
+  /* visual */
+  background: #1c2b47;
+  color: #f0f4ff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(24, 39, 75, 0.22);
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Arrow pointing down */
+.assignment-card-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  border: 6px solid transparent;
+  border-top-color: #1c2b47;
+}
+
+.assignment-card-tooltip strong {
+  color: #93b4f5;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Show on hover */
+.assignment-card-tip:hover .assignment-card-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.assignment-card-note-dot {
+  font-size: 11px;
+  cursor: default;
+  line-height: 1;
 }

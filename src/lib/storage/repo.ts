@@ -131,4 +131,25 @@ export const storageRepo = {
     storageRepo.setScheduleMeta(snapshot.scheduleMeta);
     storageRepo.setVersion(APP_VERSION);
   },
+
+  /** Menghapus semua data jadwal. AI Settings tetap dipertahankan. */
+  resetAllData: (): void => {
+    if (!canUseStorage()) return;
+    const keysToReset: (keyof typeof STORAGE_KEYS)[] = [
+      "teachers",
+      "classrooms",
+      "timeSlots",
+      "activeDays",
+      "blockedSlots",
+      "assignments",
+      "scheduleEntries",
+      "scheduleMeta",
+    ];
+    for (const key of keysToReset) {
+      window.localStorage.removeItem(STORAGE_KEYS[key]);
+    }
+    // Re-initialize defaults
+    safeWrite(STORAGE_KEYS.activeDays, defaultActiveDays());
+    safeWrite(STORAGE_KEYS.scheduleMeta, defaultScheduleMeta());
+  },
 };

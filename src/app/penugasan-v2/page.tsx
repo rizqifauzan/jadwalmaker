@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
 import { createId } from "@/lib/utils/id";
-import type { Assignment, Classroom, Teacher } from "@/types";
+import type { Assignment, Classroom, Teacher, ScheduleEntry } from "@/types";
+import { TeacherCombobox } from "@/components/ui/teacher-combobox";
 
 interface DraftRow {
   id: string;
@@ -11,6 +12,15 @@ interface DraftRow {
   subjectName: string;
   hoursPerWeek: string;
   saved: boolean;
+}
+
+interface EditState {
+  assignmentId: string;
+  teacherId: string;
+  subjectName: string;
+  hoursPerWeek: string;
+  /** How many schedule entries already consume this assignment */
+  usedCount: number;
 }
 
 const ALL_CLASSES = "__ALL_CLASSES__";
@@ -38,23 +48,56 @@ function SaveIcon(): React.JSX.Element {
   );
 }
 
+function EditIcon(): React.JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 20h4l9.5-9.5-4-4L4 16v4zm15.7-11.3a1 1 0 0 0 0-1.4l-2.6-2.6a1 1 0 0 0-1.4 0l-1.6 1.6 4 4 1.6-1.6z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon(): React.JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function XIcon(): React.JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function AssignmentsV2Page(): React.JSX.Element {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [allAssignments, setAllAssignments] = useState<Assignment[]>([]);
+  const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [selectedClassroomId, setSelectedClassroomId] = useState("");
   const [activeTabClassId, setActiveTabClassId] = useState<string>(ALL_CLASSES);
   const [rows, setRows] = useState<DraftRow[]>(createEmptyRows());
   const [message, setMessage] = useState("");
 
+  // Edit state — one row at a time
+  const [editState, setEditState] = useState<EditState | null>(null);
+
   useEffect(() => {
     const nextClassrooms = storageRepo.getClassrooms();
     const nextTeachers = storageRepo.getTeachers();
     const nextAssignments = storageRepo.getAssignments();
+    const nextEntries = storageRepo.getScheduleEntries();
 
     setClassrooms(nextClassrooms);
     setTeachers(nextTeachers);
     setAllAssignments(nextAssignments);
+    setScheduleEntries(nextEntries);
 
     const firstClassroomId = nextClassrooms[0]?.id ?? "";
     setSelectedClassroomId(firstClassroomId);
@@ -71,7 +114,6 @@ export default function AssignmentsV2Page(): React.JSX.Element {
     if (activeTabClassId === ALL_CLASSES) {
       return allAssignments;
     }
-
     return allAssignments.filter((assignment) => assignment.classroomId === activeTabClassId);
   }, [allAssignments, activeTabClassId]);
 
@@ -83,6 +125,24 @@ export default function AssignmentsV2Page(): React.JSX.Element {
     () => new Map(classrooms.map((classroom) => [classroom.id, classroom.name])),
     [classrooms],
   );
+
+  /**
+   * Map: assignmentId → count of schedule entries that use it.
+   * Matched by classroomId + subjectName (case-insensitive) + teacherId.
+   */
+  const usageMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const assignment of allAssignments) {
+      const count = scheduleEntries.filter(
+        (e) =>
+          e.classroomId === assignment.classroomId &&
+          e.subjectName.toLowerCase() === assignment.subjectName.toLowerCase() &&
+          e.teacherId === assignment.teacherId,
+      ).length;
+      map.set(assignment.id, count);
+    }
+    return map;
+  }, [allAssignments, scheduleEntries]);
 
   const hasUnsavedDraft = rows.some((row) => !row.saved && !isRowEmpty(row));
   const unsavedCount = rows.filter((row) => !row.saved && !isRowEmpty(row)).length;
@@ -233,6 +293,7 @@ export default function AssignmentsV2Page(): React.JSX.Element {
   };
 
   const deleteAssignment = (id: string): void => {
+    if (editState?.assignmentId === id) setEditState(null);
     const next = allAssignments.filter((assignment) => assignment.id !== id);
     setAllAssignments(next);
     storageRepo.setAssignments(next);
@@ -303,8 +364,83 @@ export default function AssignmentsV2Page(): React.JSX.Element {
     ]);
   };
 
+  /* ── Edit handlers ──────────────────────────────────────────── */
+  const startEdit = (assignment: Assignment): void => {
+    setEditState({
+      assignmentId: assignment.id,
+      teacherId: assignment.teacherId,
+      subjectName: assignment.subjectName,
+      hoursPerWeek: String(assignment.hoursPerWeek),
+      usedCount: usageMap.get(assignment.id) ?? 0,
+    });
+    setMessage("");
+  };
+
+  const cancelEdit = (): void => setEditState(null);
+
+  const commitEdit = (): void => {
+    if (!editState) return;
+
+    const { assignmentId, teacherId, subjectName, hoursPerWeek, usedCount } = editState;
+    const target = allAssignments.find((a) => a.id === assignmentId);
+    if (!target) return;
+
+    const hours = Number.parseInt(hoursPerWeek, 10);
+    if (Number.isNaN(hours) || hours <= 0) {
+      setMessage("Jumlah jam harus lebih dari 0.");
+      return;
+    }
+
+    if (usedCount > 0) {
+      // ── Sudah terpakai di jadwal ──────────────────────────────
+      // Guru & mapel dikunci, jam boleh naik/turun asal >= usedCount
+      if (
+        teacherId !== target.teacherId ||
+        subjectName.trim().toLowerCase() !== target.subjectName.toLowerCase()
+      ) {
+        setMessage("Penugasan ini sudah terpakai di jadwal. Guru dan mapel tidak bisa diubah.");
+        return;
+      }
+      if (hours < usedCount) {
+        setMessage(
+          `Tidak bisa mengurangi di bawah ${usedCount} jam — sudah terpakai ${usedCount}x di jadwal.`,
+        );
+        return;
+      }
+    } else {
+      // ── Belum terpakai: validasi duplikat mapel ────────────────
+      if (!teacherId || !subjectName.trim()) {
+        setMessage("Guru dan mapel wajib diisi.");
+        return;
+      }
+      const subjectLower = subjectName.trim().toLowerCase();
+      const duplicate = allAssignments.some(
+        (a) =>
+          a.id !== assignmentId &&
+          a.classroomId === target.classroomId &&
+          a.subjectName.toLowerCase() === subjectLower,
+      );
+      if (duplicate) {
+        setMessage(`Mapel "${subjectName.trim()}" sudah ada di kelas ini.`);
+        return;
+      }
+    }
+
+    const nextAll = allAssignments.map((a) =>
+      a.id === assignmentId
+        ? { ...a, teacherId, subjectName: subjectName.trim(), hoursPerWeek: hours }
+        : a,
+    );
+
+    setAllAssignments(nextAll);
+    storageRepo.setAssignments(nextAll);
+    setEditState(null);
+    setMessage("Penugasan berhasil diperbarui.");
+  };
+
   return (
     <div className="page-grid two-col">
+      {/* ── Panel kiri: Tambah draft ────────────────────────────── */}
       <section className="panel">
         <h2>Tambah Penugasan</h2>
         {classrooms.length === 0 ? (
@@ -344,18 +480,13 @@ export default function AssignmentsV2Page(): React.JSX.Element {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>
-                    <td>
-                      <select
+                    <td style={{ minWidth: 200 }}>
+                      <TeacherCombobox
+                        teachers={teachers}
                         value={row.teacherId}
-                        onChange={(event) => updateRow(row.id, { teacherId: event.target.value })}
-                      >
-                        <option value="">Pilih guru</option>
-                        {teachers.map((teacher) => (
-                          <option key={teacher.id} value={teacher.id}>
-                            {teacher.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(teacherId) => updateRow(row.id, { teacherId })}
+                        placeholder="Pilih guru"
+                      />
                     </td>
                     <td>
                       <input
@@ -403,6 +534,7 @@ export default function AssignmentsV2Page(): React.JSX.Element {
         )}
       </section>
 
+      {/* ── Generate ────────────────────────────────────────────── */}
       <section className="panel">
         <h2>Generate Penugasan Otomatis</h2>
         <p className="muted" style={{ marginBottom: "1rem" }}>
@@ -413,6 +545,7 @@ export default function AssignmentsV2Page(): React.JSX.Element {
         </button>
       </section>
 
+      {/* ── Penugasan Tersimpan ─────────────────────────────────── */}
       <section className="panel">
         <h2>Penugasan Tersimpan</h2>
         <div className="tabs" style={{ marginBottom: 12 }}>
@@ -452,23 +585,125 @@ export default function AssignmentsV2Page(): React.JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {assignmentsForTab.map((assignment) => (
-                <tr key={assignment.id}>
-                  <td>{classroomMap.get(assignment.classroomId) ?? "-"}</td>
-                  <td>{assignment.subjectName}</td>
-                  <td>{teacherMap.get(assignment.teacherId) ?? "-"}</td>
-                  <td>{assignment.hoursPerWeek}</td>
-                  <td>
-                    <button
-                      className="danger"
-                      type="button"
-                      onClick={() => deleteAssignment(assignment.id)}
-                    >
-                      Hapus
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {assignmentsForTab.map((assignment) => {
+                const isEditing = editState?.assignmentId === assignment.id;
+
+                if (isEditing && editState) {
+                  const isLocked = editState.usedCount > 0;
+                  return (
+                    <tr key={assignment.id} style={{ background: "var(--primary-soft)" }}>
+                      {/* Kelas — read-only saat edit */}
+                      <td style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                        {classroomMap.get(assignment.classroomId) ?? "-"}
+                        {isLocked && (
+                          <div style={{ marginTop: 4 }}>
+                            <span className="badge warn" style={{ fontSize: 11 }}>
+                              🔒 Terpakai {editState.usedCount}x di jadwal
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      {/* Mapel */}
+                      <td>
+                        <input
+                          value={editState.subjectName}
+                          disabled={isLocked}
+                          onChange={(e) =>
+                            setEditState({ ...editState, subjectName: e.target.value })
+                          }
+                          style={{ width: "100%", opacity: isLocked ? 0.55 : 1 }}
+                          autoFocus={!isLocked}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEdit();
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                        />
+                      </td>
+                      {/* Guru */}
+                      <td style={{ minWidth: 200, opacity: isLocked ? 0.55 : 1, pointerEvents: isLocked ? "none" : "auto" }}>
+                        <TeacherCombobox
+                          teachers={teachers}
+                          value={editState.teacherId}
+                          onChange={(teacherId) =>
+                            setEditState({ ...editState, teacherId })
+                          }
+                        />
+                      </td>
+                      {/* Jam */}
+                      <td>
+                        <input
+                          value={editState.hoursPerWeek}
+                          onChange={(e) =>
+                            setEditState({ ...editState, hoursPerWeek: e.target.value })
+                          }
+                          inputMode="numeric"
+                          style={{ width: 60 }}
+                          autoFocus={isLocked}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEdit();
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                        />
+                        {isLocked && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                            min. {editState.usedCount}
+                          </div>
+                        )}
+                      </td>
+                      {/* Aksi */}
+                      <td>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={commitEdit}
+                            title="Simpan perubahan"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                          >
+                            <CheckIcon /> Simpan
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            title="Batal edit"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                          >
+                            <XIcon /> Batal
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={assignment.id}>
+                    <td>{classroomMap.get(assignment.classroomId) ?? "-"}</td>
+                    <td>{assignment.subjectName}</td>
+                    <td>{teacherMap.get(assignment.teacherId) ?? "-"}</td>
+                    <td>{assignment.hoursPerWeek}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(assignment)}
+                          title="Edit penugasan"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                        >
+                          <EditIcon /> Edit
+                        </button>
+                        <button
+                          className="danger"
+                          type="button"
+                          onClick={() => deleteAssignment(assignment.id)}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

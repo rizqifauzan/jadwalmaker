@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { storageRepo } from "@/lib/storage/repo";
 import { dayLabel } from "@/lib/utils/day";
 import { DAYS_OF_WEEK, type Classroom, type ScheduleEntry, type Teacher, type TimeSlot } from "@/types";
+import { TeacherCombobox } from "@/components/ui/teacher-combobox";
 
 export default function PrintByTeacherPage(): React.JSX.Element {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -28,13 +29,12 @@ export default function PrintByTeacherPage(): React.JSX.Element {
       <h2>Print Jadwal per Guru</h2>
       <label>
         Pilih Guru
-        <select value={teacherId} onChange={(event) => setTeacherId(event.target.value)}>
-          {teachers.map((teacher) => (
-            <option key={teacher.id} value={teacher.id}>
-              {teacher.name}
-            </option>
-          ))}
-        </select>
+        <TeacherCombobox
+          teachers={teachers}
+          value={teacherId}
+          onChange={setTeacherId}
+          placeholder="Cari nama guru..."
+        />
       </label>
       <button type="button" onClick={() => window.print()}>
         Print PDF
